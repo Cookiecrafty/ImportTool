@@ -1,0 +1,19 @@
+#pragma once
+
+#include "Modules/ModuleManager.h"
+
+class UFactory;
+class UObject;
+
+class FAssetValidationEditorCookieModule : public IModuleInterface
+{
+public:
+
+	/** IModuleInterface implementation */
+	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
+
+private:
+	// Callback appelé après l'import d'un asset
+	void OnAssetPostImport(UFactory* InFactory, UObject* InCreatedObject);
+};
