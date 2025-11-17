@@ -29,9 +29,12 @@ public class AssetValidationEditorCookie : ModuleRules
 				"CoreUObject", 
 				"Engine",
 				"UnrealEd",
-				"DataValidation",
-				"InterchangeCore",
-				"InterchangeEngine"
+				"InterchangeCore",           // Base Interchange
+				"InterchangeEngine",        // Engine integration
+				"InterchangeNodes",         // Base nodes
+				"InterchangeFactoryNodes",  // Factory nodes (OBLIGATOIRE pour UInterchangeMeshFactoryNode)
+				"InterchangeCommonParser",  // Parser commun
+				"InterchangeImport", "DataValidation"
 			}
 			);
 			
