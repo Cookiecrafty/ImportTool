@@ -4,6 +4,7 @@
 #include "InterchangeMeshNode.h"
 #include "InterchangeStaticMeshLodDataNode.h"
 #include "InterchangeTextureFactoryNode.h"
+#include "InterchangeMaterialFactoryNode.h" 
 #include "Nodes/InterchangeBaseNode.h"
 #include "Misc/Paths.h"
 
@@ -25,6 +26,7 @@ void UInterchangeValidationPipeline::ExecutePipeline(
     const int32 MaxPolygons = PolygonLimit;
     TArray<FString> NodesToRemove;
 
+    // Static Meshes
     BaseNodeContainer->IterateNodesOfType<UInterchangeMeshFactoryNode>(
         [&](const FString& NodeID, UInterchangeMeshFactoryNode* FactoryNode)
     {
@@ -36,27 +38,28 @@ void UInterchangeValidationPipeline::ExecutePipeline(
 
         FString AssetName = FactoryNode->GetDisplayLabel();
 
-        // Validation du nommage
+        // Renommage automatique du nom si non conforme
         if (!AssetName.StartsWith(TEXT("SM_")))
         {
-            NodesToRemove.Add(NodeID);
-            bCancelImportEntire = true;
-            UE_LOG(LogTemp, Warning, TEXT("❌ StaticMesh '%s' nom invalide (attendu 'SM_')"), *AssetName);
-            return;
+            FString NewAssetName = FString(TEXT("SM_")) + AssetName;
+            FactoryNode->SetDisplayLabel(NewAssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" StaticMesh '%s' renommé auto en '%s'"), *AssetName, *NewAssetName);
         }
-        UE_LOG(LogTemp, Display, TEXT("✓ StaticMesh '%s' nom valide"), *AssetName);
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("✓ StaticMesh '%s' nom valide"), *AssetName);
+        }
 
-        // Récupérer les LOD Data Unique IDs
+        // LOD
         TArray<FString> LodDataUniqueIds;
         FactoryNode->GetLodDataUniqueIds(LodDataUniqueIds);
 
         if (LodDataUniqueIds.Num() == 0)
         {
-            UE_LOG(LogTemp, Warning, TEXT("❌ Aucun LOD Data trouvé pour %s"), *AssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" Aucun LOD Data trouvé pour %s"), *AssetName);
             return;
         }
 
-        // Récupérer le premier LOD (LOD 0)
         FString LodNodeID = LodDataUniqueIds[0];
         auto LodDataNode = Cast<UInterchangeStaticMeshLodDataNode>(
             const_cast<UInterchangeBaseNode*>(BaseNodeContainer->GetNode(LodNodeID))
@@ -64,80 +67,53 @@ void UInterchangeValidationPipeline::ExecutePipeline(
 
         if (!LodDataNode)
         {
-            UE_LOG(LogTemp, Warning, TEXT("❌ LodDataNode nul pour %s"), *LodNodeID);
+            UE_LOG(LogTemp, Warning, TEXT(" LodDataNode nul pour %s"), *LodNodeID);
             return;
         }
 
-        // Récupérer tous les mesh UIDs du LOD
         TArray<FString> MeshUids;
         LodDataNode->GetMeshUids(MeshUids);
 
         if (MeshUids.Num() == 0)
         {
-            UE_LOG(LogTemp, Warning, TEXT("❌ Aucun mesh trouvé dans le LOD pour %s"), *AssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" Aucun mesh trouvé dans le LOD pour %s"), *AssetName);
             return;
         }
 
-        // Récupérer le polygon count total
         int32 TotalPolygons = 0;
-
         for (const FString& MeshUid : MeshUids)
         {
-            UE_LOG(LogTemp, Display, TEXT("  MeshUid: %s"), *MeshUid);
-
             auto BaseNode = const_cast<UInterchangeBaseNode*>(BaseNodeContainer->GetNode(MeshUid));
             if (BaseNode)
             {
-                UE_LOG(LogTemp, Display, TEXT("    Type réel: %s"), *BaseNode->GetClass()->GetName());
-
                 auto MeshNode = Cast<UInterchangeMeshNode>(BaseNode);
                 if (MeshNode)
                 {
                     int32 PolygonCount = 0;
                     if (MeshNode->GetCustomPolygonCount(PolygonCount))
-                    {
-                        UE_LOG(LogTemp, Display, TEXT("    ✓ MeshNode PolygonCount: %d"), PolygonCount);
                         TotalPolygons += PolygonCount;
-                    }
                 }
                 else
                 {
-                    // C'est un SceneNode, récupérer l'AssetInstanceUid
                     FString AssetInstanceUid;
                     if (BaseNode->GetStringAttribute(TEXT("AssetInstanceUid"), AssetInstanceUid))
                     {
-                        UE_LOG(LogTemp, Display, TEXT("    SceneNode AssetInstanceUid: %s"), *AssetInstanceUid);
-
-                        // Récupérer le vrai mesh node
                         auto ActualMeshNode = Cast<UInterchangeMeshNode>(
                             const_cast<UInterchangeBaseNode*>(BaseNodeContainer->GetNode(AssetInstanceUid))
                         );
-
                         if (ActualMeshNode)
                         {
                             int32 PolygonCount = 0;
                             if (ActualMeshNode->GetCustomPolygonCount(PolygonCount))
-                            {
-                                UE_LOG(LogTemp, Display, TEXT("    ✓ ActualMeshNode PolygonCount: %d"), PolygonCount);
                                 TotalPolygons += PolygonCount;
-                            }
                         }
-                        else
-                        {
-                            UE_LOG(LogTemp, Display, TEXT("    ✗ Cast to MeshNode failed for %s"), *AssetInstanceUid);
-                        }
-                    }
-                    else
-                    {
-                        UE_LOG(LogTemp, Display, TEXT("    ✗ No AssetInstanceUid found"));
                     }
                 }
             }
         }
 
-        // Validation du nombre de polygones
         UE_LOG(LogTemp, Warning, TEXT("========== POLYGONE COUNT =========="));
-        UE_LOG(LogTemp, Warning, TEXT("Asset: '%s'"), *AssetName);
+        UE_LOG(LogTemp, Warning, TEXT("Asset: '%s'"), *FactoryNode->GetDisplayLabel());
         UE_LOG(LogTemp, Warning, TEXT("Total Polygones : %d"), TotalPolygons);
         UE_LOG(LogTemp, Warning, TEXT("Limite : %d"), MaxPolygons);
         UE_LOG(LogTemp, Warning, TEXT("====================================="));
@@ -146,14 +122,15 @@ void UInterchangeValidationPipeline::ExecutePipeline(
         {
             NodesToRemove.Add(NodeID);
             bCancelImportEntire = true;
-            UE_LOG(LogTemp, Error, TEXT("❌ StaticMesh '%s' trop lourd : %d polygones > max %d"), *AssetName, TotalPolygons, MaxPolygons);
+            UE_LOG(LogTemp, Error, TEXT(" StaticMesh '%s' trop lourd : %d polygones > max %d"), *FactoryNode->GetDisplayLabel(), TotalPolygons, MaxPolygons);
         }
         else if (TotalPolygons > 0)
         {
-            UE_LOG(LogTemp, Display, TEXT("✓ StaticMesh '%s' OK : %d polygones <= max %d"), *AssetName, TotalPolygons, MaxPolygons);
+            UE_LOG(LogTemp, Display, TEXT("✓ StaticMesh '%s' OK : %d polygones <= max %d"), *FactoryNode->GetDisplayLabel(), TotalPolygons, MaxPolygons);
         }
     });
 
+    // Textures
     BaseNodeContainer->IterateNodesOfType<UInterchangeTextureFactoryNode>(
         [&](const FString& NodeID, UInterchangeTextureFactoryNode* TextureNode)
     {
@@ -167,9 +144,9 @@ void UInterchangeValidationPipeline::ExecutePipeline(
 
         if (!AssetName.StartsWith(TEXT("T_")))
         {
-            NodesToRemove.Add(NodeID);
-            bCancelImportEntire = true;
-            UE_LOG(LogTemp, Warning, TEXT("❌ Texture2D '%s' nom invalide (attendu 'T_')"), *AssetName);
+            FString NewAssetName = FString(TEXT("T_")) + AssetName;
+            TextureNode->SetDisplayLabel(NewAssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" Texture2D '%s' renommée auto en '%s'"), *AssetName, *NewAssetName);
         }
         else
         {
@@ -177,11 +154,34 @@ void UInterchangeValidationPipeline::ExecutePipeline(
         }
     });
 
-    // Supprimer nodes invalides
+    // Materials (nouveau)
+    BaseNodeContainer->IterateNodesOfType<UInterchangeMaterialFactoryNode>(
+        [&](const FString& NodeID, UInterchangeMaterialFactoryNode* MaterialNode)
+    {
+        if (!MaterialNode)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Node material nul détecté pour %s"), *NodeID);
+            return;
+        }
+
+        FString AssetName = MaterialNode->GetDisplayLabel();
+
+        if (!AssetName.StartsWith(TEXT("M_")))
+        {
+            FString NewAssetName = FString(TEXT("M_")) + AssetName;
+            MaterialNode->SetDisplayLabel(NewAssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" Material '%s' renommé auto en '%s'"), *AssetName, *NewAssetName);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("✓ Material '%s' nom valide"), *AssetName);
+        }
+    });
+
     for (const FString& ID : NodesToRemove)
     {
         BaseNodeContainer->RemoveNode(ID);
-        UE_LOG(LogTemp, Warning, TEXT("❌ Node supprimé : %s"), *ID);
+        UE_LOG(LogTemp, Warning, TEXT(" Node supprimé : %s"), *ID);
     }
 
     if (bCancelImportEntire)
@@ -198,10 +198,10 @@ void UInterchangeValidationPipeline::ExecutePipeline(
             BaseNodeContainer->RemoveNode(ID);
         }
 
-        UE_LOG(LogTemp, Error, TEXT("🚫 IMPORT ANNULÉ - Erreurs de validation détectées"));
+        UE_LOG(LogTemp, Error, TEXT(" IMPORT ANNULÉ - Erreurs de validation détectées"));
     }
     else
     {
-        UE_LOG(LogTemp, Display, TEXT("✅ IMPORT VALIDÉ - Tous les assets sont conformes"));
+        UE_LOG(LogTemp, Display, TEXT(" IMPORT VALIDÉ - Tous les assets sont conformes"));
     }
 }
