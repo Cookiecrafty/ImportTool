@@ -18,5 +18,7 @@ public:
 	   const FString& ContentBasePath
 	) override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int PolygonLimit = 10000;
 
 };

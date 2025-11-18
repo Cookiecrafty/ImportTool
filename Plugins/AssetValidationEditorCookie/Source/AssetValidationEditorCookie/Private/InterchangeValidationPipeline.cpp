@@ -22,7 +22,7 @@ void UInterchangeValidationPipeline::ExecutePipeline(
     UE_LOG(LogTemp, Warning, TEXT("ExecutePipeline: début de validation"));
 
     bool bCancelImportEntire = false;
-    const int32 MaxPolygons = 1000;
+    const int32 MaxPolygons = PolygonLimit;
     TArray<FString> NodesToRemove;
 
     BaseNodeContainer->IterateNodesOfType<UInterchangeMeshFactoryNode>(
