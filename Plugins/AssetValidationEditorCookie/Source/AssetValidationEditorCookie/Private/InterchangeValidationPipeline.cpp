@@ -4,7 +4,6 @@
 #include "InterchangeMeshNode.h"
 #include "InterchangeStaticMeshLodDataNode.h"
 #include "InterchangeTextureFactoryNode.h"
-#include "InterchangeActorFactoryNode.h"
 #include "Nodes/InterchangeBaseNode.h"
 #include "Misc/Paths.h"
 

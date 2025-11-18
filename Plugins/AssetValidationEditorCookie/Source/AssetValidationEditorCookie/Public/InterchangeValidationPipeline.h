@@ -1,10 +1,9 @@
-// InterchangeValidationPipeline.h
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "InterchangePipelineBase.h"
 #include "InterchangeSourceData.h"
-#include "Nodes/InterchangeBaseNodeContainer.h"
 #include "InterchangeValidationPipeline.generated.h"
 
 UCLASS(BlueprintType, EditInlineNew)
