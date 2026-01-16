@@ -4,7 +4,9 @@
 #include "InterchangeMeshNode.h"
 #include "InterchangeStaticMeshLodDataNode.h"
 #include "InterchangeTextureFactoryNode.h"
-#include "InterchangeMaterialFactoryNode.h" 
+#include "InterchangeMaterialFactoryNode.h"
+#include "InterchangeSkeletonFactoryNode.h"
+#include "InterchangePhysicsAssetFactoryNode.h"
 #include "Nodes/InterchangeBaseNode.h"
 #include "Misc/Paths.h"
 
@@ -140,12 +142,12 @@ void UInterchangeValidationPipeline::ExecutePipeline(
             return;
         }
 
-        FString AssetName = TextureNode->GetDisplayLabel();
+        FString AssetName = TextureNode->GetAssetName();  // ✅ Utilise GetAssetName()
 
         if (!AssetName.StartsWith(TEXT("T_")))
         {
             FString NewAssetName = FString(TEXT("T_")) + AssetName;
-            TextureNode->SetDisplayLabel(NewAssetName);
+            TextureNode->SetAssetName(NewAssetName);  // ✅ Utilise SetAssetName()
             UE_LOG(LogTemp, Warning, TEXT(" Texture2D '%s' renommée auto en '%s'"), *AssetName, *NewAssetName);
         }
         else
@@ -204,4 +206,51 @@ void UInterchangeValidationPipeline::ExecutePipeline(
     {
         UE_LOG(LogTemp, Display, TEXT(" IMPORT VALIDÉ - Tous les assets sont conformes"));
     }
+    // Skeletons
+    BaseNodeContainer->IterateNodesOfType<UInterchangeSkeletonFactoryNode>(
+        [&](const FString& NodeID, UInterchangeSkeletonFactoryNode* SkeletonNode)
+    {
+        if (!SkeletonNode)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Node skeleton nul détecté pour %s"), *NodeID);
+            return;
+        }
+
+        FString AssetName = SkeletonNode->GetAssetName();
+
+        if (!AssetName.StartsWith(TEXT("SKEL_")))
+        {
+            FString NewAssetName = FString(TEXT("SKEL_")) + AssetName;
+            SkeletonNode->SetAssetName(NewAssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" Skeleton '%s' renommé auto en '%s'"), *AssetName, *NewAssetName);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("✓ Skeleton '%s' nom valide"), *AssetName);
+        }
+    });
+
+    // Physics Assets
+    BaseNodeContainer->IterateNodesOfType<UInterchangePhysicsAssetFactoryNode>(
+        [&](const FString& NodeID, UInterchangePhysicsAssetFactoryNode* PhysicsAssetNode)
+    {
+        if (!PhysicsAssetNode)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Node physics asset nul détecté pour %s"), *NodeID);
+            return;
+        }
+
+        FString AssetName = PhysicsAssetNode->GetDisplayLabel();
+
+        if (!AssetName.StartsWith(TEXT("PHYS_")))
+        {
+            FString NewAssetName = FString(TEXT("PHYS_")) + AssetName;
+            PhysicsAssetNode->SetDisplayLabel(NewAssetName);
+            UE_LOG(LogTemp, Warning, TEXT(" PhysicsAsset '%s' renommé auto en '%s'"), *AssetName, *NewAssetName);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("✓ PhysicsAsset '%s' nom valide"), *AssetName);
+        }
+    });
 }
